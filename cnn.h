@@ -2,6 +2,7 @@
 #define CNN_H
 
 #include <stdio.h>
+#include <stdlib.h>
 #include <math.h>
 #include <string.h>
 
@@ -44,7 +45,7 @@
 
 //-------------------------------------------------------------MACROS/GLOBALS---------------------------------------------------//
 
-#define MAX_LINE_SIZE 10000
+#define MAX_LINE_SIZE 100000
 
 #define COMPUTE_OUTPUT_SIZE(N_in, padding, filter_size, stride) \
     (int)floor(((N_in) + 2 * (padding) - (filter_size)) / (float)(stride) + 1)
@@ -107,24 +108,37 @@
 #define INPUT_ROWS_6 1
 #define INPUT_COLS_6 120
 #define WEIGHT_ROWS_6 120
-#define WEIGHT_ROWS_6 1
+#define WEIGHT_COLS_6 1
 #define NUM_FILTERS_6 84
 
 // Layer 7 - Fully Connected + softmax
 #define INPUT_ROWS_7 1
 #define INPUT_COLS_7 84
 #define WEIGHT_ROWS_7 84
-#define WEIGHT_ROWS_7 1
+#define WEIGHT_COLS_7 1
 #define NUM_FILTERS_7 10
 
 // Define the LeNet-5 architecture
 typedef struct
 {
+    //conv 1 (6x5x5)
     float weights1[NUM_FILTERS_1][KERNEL_SIZE_1][KERNEL_SIZE_1];
     float biases1[NUM_FILTERS_1];
+    //conv 2 (16x5x5)
+    float weights2[NUM_FILTERS_3][KERNEL_SIZE_3][KERNEL_SIZE_3];
+    float biases2[NUM_FILTERS_3];
+    //conv 3 (120x5x5)
+    float weights3[NUM_FILTERS_5][KERNEL_SIZE_5][KERNEL_SIZE_5];
+    float biases3[NUM_FILTERS_5];
+    //fc 4 (84x120x1)
+    float weights4[NUM_FILTERS_6][WEIGHT_ROWS_6];
+    float biases4[NUM_FILTERS_6];
+    //fc 5 (10x84x1)
+    float weights5[NUM_FILTERS_7][WEIGHT_ROWS_7];
+    float biases5[NUM_FILTERS_7];
 } LeNet5;
 
-
+// We load an image now, In the future we can load multiple images
 void loadDataset(float input[INPUT_ROWS_1][INPUT_COLS_1],const char* filename){
     
     FILE* file = fopen(filename,"rb");
@@ -140,8 +154,8 @@ void loadDataset(float input[INPUT_ROWS_1][INPUT_COLS_1],const char* filename){
         char* token;
         token = strtok(line, ",");   //SKIP LABEL
         token = strtok(NULL,",");
-        for(int i =2;i<INPUT_ROWS_1-2;i++){
-            for(int j=2;j<INPUT_COLS_1-2;j++){
+        for(int i=2; i<INPUT_ROWS_1-2; i++){
+            for(int j=2; j<INPUT_COLS_1-2; j++){
                 input[i][j] = atof(token)/255;
                 token = strtok(NULL,",");
             }
@@ -154,7 +168,7 @@ void loadDataset(float input[INPUT_ROWS_1][INPUT_COLS_1],const char* filename){
 // Initialize the LeNet-5 model
 void initLeNet5(LeNet5 *model)
 {
-    FILE *file = fopen("weight_bias_conv1.txt", "rb");
+    FILE *file = fopen("parameters.txt", "rb");
     if (file == NULL)
     {
         printf("Failed to open the file.\n");
@@ -183,12 +197,127 @@ void initLeNet5(LeNet5 *model)
     }
 
     // Read biases of layer 1
-    if(fgets(line, sizeof(line),file)){
+    if(fgets(line, MAX_LINE_SIZE,file)){
         char* token;
         token = strtok(line, " ");
         for (int c = 0; c < NUM_FILTERS_1; c++)
         {
             model->biases1[c] = atof(token);
+            token = strtok(NULL," ");
+        }
+    }
+
+    // Read weights of layer 3
+    if(fgets(line,MAX_LINE_SIZE,file)){
+        
+        char* token;
+        token = strtok(line, " ");
+     
+        for (int c = 0; c < NUM_FILTERS_3; c++)
+        {
+            for (int i = 0; i < KERNEL_SIZE_3; i++)
+            {
+                for (int j = 0; j < KERNEL_SIZE_3; j++)
+                {
+                    model->weights2[c][i][j] = atof(token);
+                    token = strtok(NULL," ");
+                }
+            }
+        }   
+    }
+
+    // Read biases of layer 3
+    if(fgets(line, MAX_LINE_SIZE,file)){
+        char* token;
+        token = strtok(line, " ");
+        for (int c = 0; c < NUM_FILTERS_3; c++)
+        {
+            model->biases2[c] = atof(token);
+            token = strtok(NULL," ");
+        }
+    }
+
+    // Read weights of layer 5
+    if(fgets(line,MAX_LINE_SIZE,file)){
+        
+        char* token;
+        token = strtok(line, " ");
+     
+        for (int c = 0; c < NUM_FILTERS_5; c++)
+        {
+            for (int i = 0; i < KERNEL_SIZE_5; i++)
+            {
+                for (int j = 0; j < KERNEL_SIZE_5; j++)
+                {
+                    model->weights3[c][i][j] = atof(token);
+                    token = strtok(NULL," ");
+                }
+            }
+        }   
+    }
+
+    // Read biases of layer 5
+    if(fgets(line, MAX_LINE_SIZE,file)){
+        char* token;
+        token = strtok(line, " ");
+        for (int c = 0; c < NUM_FILTERS_5; c++)
+        {
+            model->biases3[c] = atof(token);
+            token = strtok(NULL," ");
+        }
+    }    
+
+
+    // Read weights of layer 6
+    if(fgets(line,MAX_LINE_SIZE,file)){
+        
+        char* token;
+        token = strtok(line, " ");
+     
+        for (int c = 0; c < NUM_FILTERS_6; c++)
+        {
+            for (int i = 0; i < WEIGHT_ROWS_6; i++)
+            {
+                model->weights4[c][i] = atof(token);
+                token = strtok(NULL," ");
+            }
+        }   
+    }
+
+    // Read biases of layer 6
+    if(fgets(line, MAX_LINE_SIZE,file)){
+        char* token;
+        token = strtok(line, " ");
+        for (int c = 0; c < NUM_FILTERS_6; c++)
+        {
+            model->biases4[c] = atof(token);
+            token = strtok(NULL," ");
+        }
+    }
+
+    // Read weights of layer 7
+    if(fgets(line,MAX_LINE_SIZE,file)){
+        
+        char* token;
+        token = strtok(line, " ");
+     
+        for (int c = 0; c < NUM_FILTERS_7; c++)
+        {
+            for (int i = 0; i < WEIGHT_ROWS_7; i++)
+            {
+                model->weights5[c][i] = atof(token);
+                token = strtok(NULL," ");
+            }
+        }   
+    }
+
+    // Read biases of layer 7
+    if(fgets(line, MAX_LINE_SIZE,file)){
+        char* token;
+        token = strtok(line, " ");
+        for (int c = 0; c < NUM_FILTERS_7; c++)
+        {
+            model->biases5[c] = atof(token);
             token = strtok(NULL," ");
         }
     }
