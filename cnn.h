@@ -3,34 +3,53 @@
 
 #include <stdio.h>
 #include <math.h>
+#include <string.h>
 
 /*
-        LeNet-5 CNN Architecture
-        1) The input image is 28x28x1 but we need to apply padding (p=1) with zeros and make it 32x32x1 b/c layer 1 will shrink the image back to 28x28x1
-        2) The first layer is a convolution layer which first performs "y = W.X + b" for linear function then performs a "tanh()" as activation function
-            2.1) The layer 1 will output 6 filter maps each having dimensions of 28x28x1
-            2.2) The second part of convolution layer includes the "average pool kernel"
+    Optimization TODO (Dr. Umar):
+        1) Convert Floating points to Integer
+        2) Apply Vectorization (SIMD)
+        3) Apply Row Wise operations
 
-        Formulae:
-            Dimension of output matrix for padding, stride and, kernel_size
-            1) N_out = floor( ( N_in + 2 * padding - filter_size) / stride + 1 )
-            2) M_out = floor( ( M_in + 2 * padding - filter_size) / stride + 1 )
+    Dimension:
+        batch_size x channels x rows x columns
 
-        Activation Function:
-            1) tanh()
+    Dataset:
+        Mnist [handwritten][0-9]
 
-        Linear Function:
-            1) y = W.X + b
+    LeNet-5 CNN Architecture:
+        1) The input layer image is 1x1x28x28
+        2) The first hidden layer is a convolution layer [p=2,s=1,f=5,a=tanh] which outputs 1x1x28x28
+        3) The second layer is a subsampling [p=0,s=2,f=2,a=avg_pool] which outputs 1x6x14x14
+        4) The third layer is a convolution [p=0,s=1,f=5,a=tanh] which outputs 1x6x10x10
+        5) The fourth layer is a subsampling [p=0,s=2,f=2,a=avg_pool] which outputs 1x16x5x5
+        6) The fifth layer is a convolution [p=0,s=1,f=5,a=tanh] which outputs 1x120x1x1
+        7) We will flatten the 1x120x1x1 feature maps into 1x120
+        8) The sixth layer is fully connected [a=tanh] which outputs 1x84x1x1
+        9) The seventh layer is a fully connected [a=softmax] which outputs 1x10x1x1
+        10) The output layer will have an argmax() to tell us which neuron from seventh layer had highest probability
 
-        Subsampling Function:
-            1) average_pool
+    Formulae:
+        Dimension of output matrix for padding, stride and, kernel_size
+        1) N_out = floor( ( N_in + 2 * padding - filter_size) / stride + 1 )
+        2) M_out = floor( ( M_in + 2 * padding - filter_size) / stride + 1 )
 
-        Helper Function:
-            1) Apply padding (We won't be sending matrices for padding apparently)
+    Activation Function:
+        1) tanh()
+        2) softmax()
+
+    Subsampling Function:
+        1) average_pool
 */
+
+//-------------------------------------------------------------MACROS/GLOBALS---------------------------------------------------//
+
+#define MAX_LINE_SIZE 10000
 
 #define COMPUTE_OUTPUT_SIZE(N_in, padding, filter_size, stride) \
     (int)floor(((N_in) + 2 * (padding) - (filter_size)) / (float)(stride) + 1)
+
+//-------------------------------------------------------------Lenet-5 Configuration-------------------------------------------//
 
 // Layer 1 - convolution + tanh
 #define INPUT_ROWS_1 32
@@ -38,7 +57,7 @@
 #define KERNEL_SIZE_1 5
 #define STRIDE_1 1
 #define PADDING_1 0
-#define NUM_FILTERS_1 6 // output channel of layer 1
+#define NUM_FILTERS_1 6
 #define OUTPUT_ROWS_1 COMPUTE_OUTPUT_SIZE(INPUT_ROWS_1, PADDING_1, KERNEL_SIZE_1, STRIDE_1)
 #define OUTPUT_COLS_1 COMPUTE_OUTPUT_SIZE(INPUT_COLS_1, PADDING_1, KERNEL_SIZE_1, STRIDE_1)
 
@@ -48,9 +67,55 @@
 #define KERNEL_SIZE_2 2
 #define STRIDE_2 2
 #define PADDING_2 0
-#define NUM_FILTERS_2 6 // output channel of layer 2
+#define NUM_FILTERS_2 6
 #define OUTPUT_ROWS_2 COMPUTE_OUTPUT_SIZE(INPUT_ROWS_2, PADDING_2, KERNEL_SIZE_2, STRIDE_2)
 #define OUTPUT_COLS_2 COMPUTE_OUTPUT_SIZE(INPUT_COLS_2, PADDING_2, KERNEL_SIZE_2, STRIDE_2)
+
+// Layer 3 - convolution + tanh
+#define INPUT_ROWS_3 OUPUT_ROWS_2
+#define INPUT_COLS_3 OUTPUT_COLS_2
+#define KERNEL_SIZE_3 5
+#define STRIDE_3 1
+#define PADDING_3 0
+#define NUM_FILTERS_3 16
+#define OUTPUT_ROWS_3 COMPUTE_OUTPUT_SIZE(INPUT_ROWS_3, PADDING_3, KERNEL_SIZE_3, STRIDE_3)
+#define OUTPUT_COLS_3 COMPUTE_OUTPUT_SIZE(INPUT_COLS_3, PADDING_3, KERNEL_SIZE_3, STRIDE_3)
+
+// Layer 4 - Average Pooling
+#define INPUT_ROWS_4 OUPUT_ROWS_3
+#define INPUT_COLS_4 OUTPUT_COLS_3
+#define KERNEL_SIZE_4 2
+#define STRIDE_4 2
+#define PADDING_4 0
+#define NUM_FILTERS_4 16
+#define OUTPUT_ROWS_4 COMPUTE_OUTPUT_SIZE(INPUT_ROWS_4, PADDING_4, KERNEL_SIZE_4, STRIDE_4)
+#define OUTPUT_COLS_4 COMPUTE_OUTPUT_SIZE(INPUT_COLS_4, PADDING_4, KERNEL_SIZE_4, STRIDE_4)
+
+// Layer 5 - convolution + tanh
+#define INPUT_ROWS_5 OUPUT_ROWS_4
+#define INPUT_COLS_5 OUTPUT_COLS_4
+#define KERNEL_SIZE_5 5
+#define STRIDE_5 1
+#define PADDING_5 0
+#define NUM_FILTERS_5 120
+#define OUTPUT_ROWS_5 COMPUTE_OUTPUT_SIZE(INPUT_ROWS_5, PADDING_5, KERNEL_SIZE_5, STRIDE_5)
+#define OUTPUT_COLS_5 COMPUTE_OUTPUT_SIZE(INPUT_COLS_5, PADDING_5, KERNEL_SIZE_5, STRIDE_5)
+
+// NOTE: We will Flatten the layers before passing to Fully Connected Layers
+
+// Layer 6 - Fully Connected + tanh
+#define INPUT_ROWS_6 1
+#define INPUT_COLS_6 120
+#define WEIGHT_ROWS_6 120
+#define WEIGHT_ROWS_6 1
+#define NUM_FILTERS_6 84
+
+// Layer 7 - Fully Connected + softmax
+#define INPUT_ROWS_7 1
+#define INPUT_COLS_7 84
+#define WEIGHT_ROWS_7 84
+#define WEIGHT_ROWS_7 1
+#define NUM_FILTERS_7 10
 
 // Define the LeNet-5 architecture
 typedef struct
@@ -59,68 +124,108 @@ typedef struct
     float biases1[NUM_FILTERS_1];
 } LeNet5;
 
-// hyperbolic tan activation function
-float tanh_activation(float x)
-{
-    return tanh(x);
+
+void loadDataset(float input[INPUT_ROWS_1][INPUT_COLS_1],const char* filename){
+    
+    FILE* file = fopen(filename,"rb");
+    
+    if(file == NULL){
+        printf("Failed to open the file\n");
+        return;
+    }
+
+    char line[MAX_LINE_SIZE];
+    if(fgets(line,sizeof(line),file)){
+        
+        char* token;
+        token = strtok(line, ",");   //SKIP LABEL
+        token = strtok(NULL,",");
+        for(int i =2;i<INPUT_ROWS_1-2;i++){
+            for(int j=2;j<INPUT_COLS_1-2;j++){
+                input[i][j] = atof(token)/255;
+                token = strtok(NULL,",");
+            }
+        }
+    }
+
+    fclose(file);
 }
 
 // Initialize the LeNet-5 model
 void initLeNet5(LeNet5 *model)
 {
-    FILE *file = fopen("parameters.txt", "r");
+    FILE *file = fopen("weight_bias_conv1.txt", "rb");
     if (file == NULL)
     {
         printf("Failed to open the file.\n");
         return;
     }
 
+    char line[MAX_LINE_SIZE];
+
     // Read weights of layer 1
-    for (int c = 0; c < NUM_FILTERS_1; c++)
-    {
-        for (int i = 0; i < KERNEL_SIZE_1; i++)
+    if(fgets(line,MAX_LINE_SIZE,file)){
+        
+        char* token;
+        token = strtok(line, " ");
+     
+        for (int c = 0; c < NUM_FILTERS_1; c++)
         {
-            for (int j = 0; j < KERNEL_SIZE_1; j++)
+            for (int i = 0; i < KERNEL_SIZE_1; i++)
             {
-                fscanf(file, "%f", model->weights1[c][i][j]);
+                for (int j = 0; j < KERNEL_SIZE_1; j++)
+                {
+                    model->weights1[c][i][j] = atof(token);
+                    token = strtok(NULL," ");
+                }
             }
-        }
+        }   
     }
 
     // Read biases of layer 1
-    for (int c = 0; c < NUM_FILTERS_1; c++)
-    {
-        fscanf(file, "%f", &model->biases1[c]);
+    if(fgets(line, sizeof(line),file)){
+        char* token;
+        token = strtok(line, " ");
+        for (int c = 0; c < NUM_FILTERS_1; c++)
+        {
+            model->biases1[c] = atof(token);
+            token = strtok(NULL," ");
+        }
     }
 
     fclose(file);
 }
 
-void convolution(float **input_matrix, int input_rows, int input_cols,
-                 float ***kernel, int kernel_rows, int kernel_cols,
-                 float *bias, int no_of_filters,
-                 float ***layer, int output_rows, int output_cols,
-                 int padding, int stride, float (*activation)(float))
+void layer_2_subsampling(double input_matrix[INPUT_ROWS_1][INPUT_COLS_1],
+                 LeNet5* model, double layer1[NUM_FILTERS_1][OUTPUT_ROWS_1][OUTPUT_COLS_1])
 {
-    for (int filter_no = 0; filter_no < no_of_filters; filter_no++)
+    for(int filter_no = 0;filter_no < NUM_FILTERS_1;filter_no++){
+
+    }
+}
+
+void layer_1_conv(float input_matrix[INPUT_ROWS_1][INPUT_COLS_1], LeNet5* model, float layer1[NUM_FILTERS_1][OUTPUT_ROWS_1][OUTPUT_COLS_1])
+{
+    for (int filter_no = 0; filter_no < NUM_FILTERS_1; filter_no++)
     {
-        for (int input_row = 0; input_row < output_rows; input_row++)
+        for (int input_row = 0; input_row < OUTPUT_ROWS_1; input_row++)
         {
-            for (int input_col = 0; input_col < output_cols; input_col++)
+            for (int input_col = 0; input_col < OUTPUT_COLS_1; input_col++)
             {
                 float sum = 0.0;
 
                 // Dot product
-                for (int kernel_row = 0; kernel_row < kernel_rows; kernel_row++)
+                for (int kernel_row = 0; kernel_row < KERNEL_SIZE_1; kernel_row++)
                 {
-                    for (int kernel_col = 0; kernel_col < kernel_cols; kernel_col++)
+                    for (int kernel_col = 0; kernel_col < KERNEL_SIZE_1; kernel_col++)
                     {
-                        sum += input_matrix[input_row * stride + kernel_row][input_col * stride + kernel_col] * kernel[filter_no][kernel_row][kernel_col];
+                        sum += input_matrix[input_row + kernel_row][input_col + kernel_col] * model->weights1[filter_no][kernel_row][kernel_col];
                     }
                 }
 
                 // Feature Map
-                layer[filter_no][input_row][input_col] = (*activation)(sum + bias[filter_no]);
+                // layer1[filter_no][input_row][input_col] = sum;
+                layer1[filter_no][input_row][input_col] = tanh((sum + model->biases1[filter_no]));
             }
         }
     }
