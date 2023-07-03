@@ -1,0 +1,1 @@
+/usr/bin/cc CMakeFiles/Lenet_5_CNN.dir/src/cnn.c.o -o Lenet_5_CNN  -lm 
