@@ -1,3 +1,0 @@
-/home/rngesusexe/Programming/neural_network/LeNet-5_CNN_in_C/build/CMakeFiles/Lenet_5_CNN.dir
-/home/rngesusexe/Programming/neural_network/LeNet-5_CNN_in_C/build/CMakeFiles/edit_cache.dir
-/home/rngesusexe/Programming/neural_network/LeNet-5_CNN_in_C/build/CMakeFiles/rebuild_cache.dir

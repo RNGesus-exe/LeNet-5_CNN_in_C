@@ -1,7 +1,0 @@
-[
-{
-  "directory": "/home/rngesusexe/Programming/neural_network/LeNet-5_CNN_in_C/build",
-  "command": "/usr/bin/cc  -I/home/rngesusexe/Programming/neural_network/LeNet-5_CNN_in_C/include -std=gnu11 -o CMakeFiles/Lenet_5_CNN.dir/src/cnn.c.o -c /home/rngesusexe/Programming/neural_network/LeNet-5_CNN_in_C/src/cnn.c",
-  "file": "/home/rngesusexe/Programming/neural_network/LeNet-5_CNN_in_C/src/cnn.c"
-}
-]
